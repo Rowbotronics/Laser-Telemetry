@@ -1,14 +1,18 @@
 #include <OneWire.h>
 
-#define DANIEL
-//#define LILLY
+//#define DANIEL
+#define LILLY
 //#define TEST
+
+#define SEND_INTERVAL 100
 
 OneWire  ds(10);  // on pin 10 (a 4.7K resistor is necessary)
 
 volatile float pulse_count[5] = {0};
 long pulse_count_duration[5] = {0};
 byte pulse_bank = 0;
+unsigned long pulse_time[10] = {0};
+volatile int pulse_time_index = 0;
 //unsigned long last_time;
 
 byte laser_pin = 6;
@@ -43,6 +47,9 @@ float temperatures[3] = {0};
 void rpm_int()
  {
       pulse_count[pulse_bank]++;
+      pulse_time_index = (pulse_time_index+1)%10;
+      pulse_time[pulse_time_index] = micros();
+//      Serial.println((pulse_time_index++)%10);
  }
 
 
@@ -217,6 +224,21 @@ long ReadRPM() {
    return rpm;
 }
 
+long ReadRPM2() {
+//  Serial.println(pulse_time_index);
+   static long rpm;
+   int last_pulse_time_index = pulse_time_index-1;
+//   Serial.println(pulse_time_index);
+   if (last_pulse_time_index < 0)
+      last_pulse_time_index = 9;
+   rpm = 30000000/(pulse_time[pulse_time_index] - pulse_time[last_pulse_time_index]);
+//   Serial.println(pulse_time_index);
+   if(micros() - pulse_time[pulse_time_index] > 3000000){
+    rpm=0;
+   }
+   return rpm;
+}
+
 void setup()
  {
    Serial.begin(115200);
@@ -238,7 +260,7 @@ void setup()
   long current_time = millis();
 //  ReadRPM();
 //  if(false)
-  if(current_time - last_print > 100)
+  if(current_time - last_print > SEND_INTERVAL)
   {
      //Print out result to serial 
      Serial.println("{");  
@@ -251,9 +273,12 @@ void setup()
      Serial.print("\"mirror3\": ");
      Serial.print(temperatures[2]);
      Serial.println(", ");
-     Serial.print("\"fan1\": ");
-     Serial.print(ReadRPM());
+     Serial.print("\"fan\": ");
+     Serial.print(ReadRPM2());
      Serial.println(", ");
+//     Serial.print("\"fan2\": ");
+//     Serial.print(ReadRPM2());
+//     Serial.println(", ");
      Serial.print("\"door\": ");
      Serial.print(!digitalRead(door_pin));
      Serial.println(", ");
